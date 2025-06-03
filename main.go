@@ -23,7 +23,7 @@ func main() {
 	)
 
 	app.Get("/", func(c *fiber.Ctx) error {
-		return c.Status(200).JSON(&fiber.Map{"message": "Fiber running with Fume"})
+		return c.Status(200).JSON(&fiber.Map{"message": "Fiber running with Fume", "version": "v2.52.2"})
 	})
 	fume.Start(app, fume.Options{})
 }
