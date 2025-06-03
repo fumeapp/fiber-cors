@@ -4,7 +4,21 @@ import (
 	fume "github.com/fumeapp/fiber"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"runtime/debug"
 )
+
+func getFiberVersion() string {
+	buildInfo, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "unknown"
+	}
+	for _, dep := range buildInfo.Deps {
+		if dep.Path == "github.com/gofiber/fiber/v2" {
+			return dep.Version
+		}
+	}
+	return "unknown"
+}
 
 func main() {
 	app := fiber.New()
@@ -23,7 +37,7 @@ func main() {
 	)
 
 	app.Get("/", func(c *fiber.Ctx) error {
-		return c.Status(200).JSON(&fiber.Map{"message": "Fiber running with Fume", "version": "v2.52.2"})
+		return c.Status(200).JSON(&fiber.Map{"message": "Fiber running with Fume", "version": getFiberVersion()})
 	})
 	fume.Start(app, fume.Options{})
 }
