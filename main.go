@@ -13,11 +13,11 @@ func main() {
 	app.Use(
 		cors.New(
 			cors.Config{
-				AllowOrigins:     "https://console.ngrok.app",
+				AllowOrigins:     "https://console.ngrok.dev, https://vc-api.ngrok.dev",
 				AllowCredentials: true,
 				AllowHeaders:     "Origin, Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, User-Agent",
 				ExposeHeaders:    "Origin, User-Agent",
-				AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS,PATCH,HEAD",
+				AllowMethods:     "GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD",
 			},
 		),
 	)
