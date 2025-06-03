@@ -27,7 +27,7 @@ func main() {
 	app.Use(
 		cors.New(
 			cors.Config{
-				AllowOrigins:     "https://console.ngrok.dev, https://api.ngrok.dev",
+				AllowOrigins:     "https://console.ngrok.dev, http://localhost:3000, https://api.ngrok.dev",
 				AllowCredentials: true,
 				AllowHeaders:     "Origin, Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, User-Agent",
 				ExposeHeaders:    "Origin, User-Agent",
@@ -37,6 +37,9 @@ func main() {
 	)
 
 	app.Get("/", func(c *fiber.Ctx) error {
+		return c.Status(200).JSON(&fiber.Map{"message": "Fiber running with Fume", "version": getFiberVersion()})
+	})
+	app.Post("/", func(c *fiber.Ctx) error {
 		return c.Status(200).JSON(&fiber.Map{"message": "Fiber running with Fume", "version": getFiberVersion()})
 	})
 	fume.Start(app, fume.Options{})
