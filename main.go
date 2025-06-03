@@ -3,10 +3,25 @@ package main
 import (
 	fume "github.com/fumeapp/fiber"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 )
 
 func main() {
 	app := fiber.New()
+
+	// configure CORS middleware
+	app.Use(
+		cors.New(
+			cors.Config{
+				AllowOrigins:     "https://console.ngrok.app",
+				AllowCredentials: true,
+				AllowHeaders:     "Origin, Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, User-Agent",
+				ExposeHeaders:    "Origin, User-Agent",
+				AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS,PATCH,HEAD",
+			},
+		),
+	)
+
 	app.Get("/", func(c *fiber.Ctx) error {
 		return c.Status(200).JSON(&fiber.Map{"message": "Fiber running with Fume"})
 	})

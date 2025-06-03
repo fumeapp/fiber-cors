@@ -3,11 +3,14 @@ module github.com/fumeapp/fiber-cors
 go 1.24.2
 
 require (
+	github.com/fumeapp/fiber v0.2.0
+	github.com/gofiber/fiber/v2 v2.52.2
+)
+
+require (
 	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/aws/aws-lambda-go v1.41.0 // indirect
-	github.com/awslabs/aws-lambda-go-api-proxy v0.16.0 // indirect
-	github.com/fumeapp/fiber v0.3.0 // indirect
-	github.com/gofiber/fiber/v2 v2.52.8 // indirect
+	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
