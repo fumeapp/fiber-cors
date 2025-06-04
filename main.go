@@ -26,7 +26,7 @@ func main() {
 	app := fiber.New()
 	config :=
 		cors.Config{
-			AllowOrigins:     "https://fiber-cors-nuxt.acidjazz.workers.dev, http://localhost:3000",
+			AllowOrigins:     "https://fiber-cors-nuxt.acidjazz.workers.dev, https://console.domain.com, http://localhost:3000",
 			AllowCredentials: true,
 			AllowHeaders:     "Origin, Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, User-Agent",
 			ExposeHeaders:    "Origin, User-Agent",
