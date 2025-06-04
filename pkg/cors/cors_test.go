@@ -9,12 +9,15 @@ import (
 
 func TestCorsMiddleware(t *testing.T) {
 	tests := []struct {
-		name           string
-		config         Config
-		requestOrigin  string
-		requestMethod  string
-		expectedOrigin string
-		expectedStatus int
+		name                 string
+		config               Config
+		requestOrigin        string
+		requestMethod        string
+		requestHeaders       map[string]string
+		expectedOrigin       string
+		expectedStatus       int
+		expectedMaxAge       string
+		expectPreflightCheck bool
 	}{
 		{
 			name: "allowed origin",
@@ -86,6 +89,68 @@ func TestCorsMiddleware(t *testing.T) {
 			expectedOrigin: "https://example.com",
 			expectedStatus: 200,
 		},
+		{
+			name: "preflight request with Access-Control-Request-Method",
+			config: Config{
+				AllowOrigins:     "https://example.com",
+				AllowCredentials: true,
+				AllowHeaders:     "Content-Type",
+				ExposeHeaders:    "X-Custom",
+				AllowMethods:     "GET, POST, OPTIONS",
+				MaxAge:           3600,
+			},
+			requestOrigin: "https://example.com",
+			requestMethod: "OPTIONS",
+			requestHeaders: map[string]string{
+				"Access-Control-Request-Method": "POST",
+			},
+			expectedOrigin:       "https://example.com",
+			expectedStatus:       204,
+			expectedMaxAge:       "3600",
+			expectPreflightCheck: true,
+		},
+		{
+			name: "preflight request with custom headers",
+			config: Config{
+				AllowOrigins:     "https://example.com",
+				AllowCredentials: true,
+				AllowHeaders:     "Content-Type, Authorization",
+				ExposeHeaders:    "X-Custom",
+				AllowMethods:     "GET, POST, OPTIONS",
+				MaxAge:           3600,
+			},
+			requestOrigin: "https://example.com",
+			requestMethod: "OPTIONS",
+			requestHeaders: map[string]string{
+				"Access-Control-Request-Method":  "POST",
+				"Access-Control-Request-Headers": "Authorization",
+			},
+			expectedOrigin:       "https://example.com",
+			expectedStatus:       204,
+			expectedMaxAge:       "3600",
+			expectPreflightCheck: true,
+		},
+		{
+			name: "preflight request with echo back headers",
+			config: Config{
+				AllowOrigins:     "https://example.com",
+				AllowCredentials: true,
+				AllowHeaders:     "",
+				ExposeHeaders:    "X-Custom",
+				AllowMethods:     "GET, POST, OPTIONS",
+				MaxAge:           3600,
+			},
+			requestOrigin: "https://example.com",
+			requestMethod: "OPTIONS",
+			requestHeaders: map[string]string{
+				"Access-Control-Request-Method":  "POST",
+				"Access-Control-Request-Headers": "Authorization, X-Custom-Header",
+			},
+			expectedOrigin:       "https://example.com",
+			expectedStatus:       204,
+			expectedMaxAge:       "3600",
+			expectPreflightCheck: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -99,6 +164,13 @@ func TestCorsMiddleware(t *testing.T) {
 			req := httptest.NewRequest(tt.requestMethod, "/", nil)
 			if tt.requestOrigin != "" {
 				req.Header.Set("Origin", tt.requestOrigin)
+			}
+
+			// Set additional request headers if provided
+			if tt.requestHeaders != nil {
+				for key, value := range tt.requestHeaders {
+					req.Header.Set(key, value)
+				}
 			}
 
 			resp, err := app.Test(req)
@@ -142,8 +214,33 @@ func TestCorsMiddleware(t *testing.T) {
 					t.Errorf("Expected Access-Control-Allow-Methods to be %q but got %q", tt.config.AllowMethods, methods)
 				}
 			}
+
+			// Check Max-Age header for preflight requests
+			if tt.expectPreflightCheck && tt.expectedMaxAge != "" {
+				maxAge := resp.Header.Get("Access-Control-Max-Age")
+				if maxAge != tt.expectedMaxAge {
+					t.Errorf("Expected Access-Control-Max-Age to be %q but got %q", tt.expectedMaxAge, maxAge)
+				}
+			}
 		})
 	}
+}
+
+// Test that the middleware correctly validates configuration and panics when AllowCredentials=true with AllowOrigins=*
+func TestCorsConfigValidation(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("Expected panic with AllowCredentials=true and AllowOrigins=*, but no panic occurred")
+		}
+	}()
+
+	corsConfig := Config{
+		AllowOrigins:     "*",
+		AllowCredentials: true,
+	}
+
+	// This should panic
+	New(corsConfig)
 }
 
 func TestCorsWithMultipleMiddleware(t *testing.T) {
@@ -197,7 +294,7 @@ func TestCorsWithWildcardOrigin(t *testing.T) {
 
 	corsConfig := Config{
 		AllowOrigins:     "*",
-		AllowCredentials: true,
+		AllowCredentials: false, // Must be false with wildcard origin
 		AllowHeaders:     "Content-Type",
 		ExposeHeaders:    "X-Custom",
 		AllowMethods:     "GET, POST",

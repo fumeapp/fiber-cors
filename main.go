@@ -32,6 +32,7 @@ func main() {
 		AllowHeaders:     "Origin, Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, User-Agent",
 		ExposeHeaders:    "Origin, User-Agent",
 		AllowMethods:     "GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD",
+		MaxAge:           86400, // Cache preflight results for 24 hours (in seconds)
 	}
 
 	app.Use(cors.New(corsConfig))
@@ -43,6 +44,7 @@ func main() {
 			"AllowHeaders":     corsConfig.AllowHeaders,
 			"ExposeHeaders":    corsConfig.ExposeHeaders,
 			"AllowMethods":     corsConfig.AllowMethods,
+			"MaxAge":           corsConfig.MaxAge,
 		}
 		return c.Status(200).JSON(&fiber.Map{
 			"message":   "Fiber running with Fume",
