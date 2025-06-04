@@ -44,6 +44,7 @@ func New(config Config) fiber.Handler {
 				allowAll = true
 				break
 			}
+			// Add to allowed origins
 			if origin != "" {
 				allowedOriginsMap[origin] = true
 			}
@@ -64,62 +65,61 @@ func New(config Config) fiber.Handler {
 		isPreflight := c.Method() == "OPTIONS" && c.Get("Access-Control-Request-Method") != ""
 		isOptions := c.Method() == "OPTIONS"
 
-		// Check if origin is allowed and set Access-Control-Allow-Origin if it is
+		// Check if the request's origin is allowed according to the configuration
+		originAllowed := false
 		if origin != "" {
-			if allowAll {
-				// For wildcard origins, we should echo back the actual origin rather than "*"
-				c.Set("Access-Control-Allow-Origin", origin)
-			} else if len(allowedOriginsMap) == 0 || allowedOriginsMap[origin] {
+			if allowAll || len(allowedOriginsMap) == 0 || allowedOriginsMap[origin] {
+				originAllowed = true
+				// CORS spec: Echo actual origin instead of "*" wildcard
 				c.Set("Access-Control-Allow-Origin", origin)
 			}
 		}
 
-		// Set CORS headers regardless of whether the origin is allowed
-		// This is to match the test expectations, though it's not strictly according to spec
+		// CORS spec: Only set headers for allowed origins
+		if originAllowed || origin == "" {
+			// Set Access-Control-Allow-Credentials if enabled
+			if config.AllowCredentials {
+				c.Set("Access-Control-Allow-Credentials", "true")
+			}
 
-		// Set Access-Control-Allow-Credentials if enabled
-		if config.AllowCredentials {
-			c.Set("Access-Control-Allow-Credentials", "true")
-		}
+			// Set CORS headers
+			if config.AllowHeaders != "" {
+				c.Set("Access-Control-Allow-Headers", config.AllowHeaders)
+			}
 
-		// Always set these headers for both preflight and actual requests
-		if config.AllowHeaders != "" {
-			c.Set("Access-Control-Allow-Headers", config.AllowHeaders)
-		}
+			if config.AllowMethods != "" {
+				c.Set("Access-Control-Allow-Methods", config.AllowMethods)
+			}
 
-		if config.AllowMethods != "" {
-			c.Set("Access-Control-Allow-Methods", config.AllowMethods)
-		}
-
-		if config.ExposeHeaders != "" {
-			c.Set("Access-Control-Expose-Headers", config.ExposeHeaders)
+			if config.ExposeHeaders != "" {
+				c.Set("Access-Control-Expose-Headers", config.ExposeHeaders)
+			}
 		}
 
 		if isPreflight {
 			// Handle preflight request
+			if originAllowed || origin == "" {
+				// Handle request headers
+				requestHeaders := c.Get("Access-Control-Request-Headers")
+				if config.AllowHeaders == "" && requestHeaders != "" {
+					// CORS spec: Echo requested headers when no specific headers configured
+					c.Set("Access-Control-Allow-Headers", requestHeaders)
+				}
 
-			// Set Access-Control-Allow-Headers (potentially overriding the one set above)
-			requestHeaders := c.Get("Access-Control-Request-Headers")
-			if config.AllowHeaders == "" && requestHeaders != "" {
-				// Echo back the request headers if no specific headers are configured
-				c.Set("Access-Control-Allow-Headers", requestHeaders)
+				// Set Access-Control-Max-Age if configured
+				if config.MaxAge > 0 {
+					c.Set("Access-Control-Max-Age", strconv.Itoa(config.MaxAge))
+				}
 			}
 
-			// Set Access-Control-Max-Age if configured
-			if config.MaxAge > 0 {
-				c.Set("Access-Control-Max-Age", strconv.Itoa(config.MaxAge))
-			}
-
-			// Return 204 No Content for successful preflight
+			// Return 204 No Content for preflight
 			return c.SendStatus(204)
 		} else if isOptions {
 			// Handle simple OPTIONS request (not a preflight)
 			return c.SendStatus(204)
 		}
 
-		// If this is a CORS request and the origin is not allowed, we should still
-		// proceed with the request but without setting the Access-Control-Allow-Origin header
-		// The browser will block the response due to CORS policy
+		// CORS spec: For disallowed origins, process request but browser will block response
 		return c.Next()
 	}
 }

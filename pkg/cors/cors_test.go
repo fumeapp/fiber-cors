@@ -44,7 +44,7 @@ func TestCorsMiddleware(t *testing.T) {
 			},
 			requestOrigin:  "https://disallowed.com",
 			requestMethod:  "GET",
-			expectedOrigin: "",
+			expectedOrigin: "", // No Access-Control-Allow-Origin header for disallowed origins
 			expectedStatus: 200,
 		},
 		{
@@ -76,9 +76,9 @@ func TestCorsMiddleware(t *testing.T) {
 			expectedStatus: 204,
 		},
 		{
-			name: "empty config",
+			name: "empty config - all origins allowed",
 			config: Config{
-				AllowOrigins:     "",
+				AllowOrigins:     "", // Empty AllowOrigins means all origins are allowed
 				AllowCredentials: false,
 				AllowHeaders:     "",
 				ExposeHeaders:    "",
@@ -86,7 +86,7 @@ func TestCorsMiddleware(t *testing.T) {
 			},
 			requestOrigin:  "https://example.com",
 			requestMethod:  "GET",
-			expectedOrigin: "https://example.com",
+			expectedOrigin: "https://example.com", // Origin is allowed with empty config
 			expectedStatus: 200,
 		},
 		{
@@ -151,6 +151,27 @@ func TestCorsMiddleware(t *testing.T) {
 			expectedMaxAge:       "3600",
 			expectPreflightCheck: true,
 		},
+		{
+			name: "preflight request with disallowed origin",
+			config: Config{
+				AllowOrigins:     "https://example.com",
+				AllowCredentials: true,
+				AllowHeaders:     "Content-Type",
+				ExposeHeaders:    "X-Custom",
+				AllowMethods:     "GET, POST, OPTIONS",
+				MaxAge:           3600,
+			},
+			requestOrigin: "https://disallowed.com",
+			requestMethod: "OPTIONS",
+			requestHeaders: map[string]string{
+				"Access-Control-Request-Method":  "POST",
+				"Access-Control-Request-Headers": "Authorization",
+			},
+			expectedOrigin:       "", // No Access-Control-Allow-Origin header for disallowed origins
+			expectedStatus:       204,
+			expectedMaxAge:       "", // No Max-Age header for disallowed origins
+			expectPreflightCheck: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -187,39 +208,72 @@ func TestCorsMiddleware(t *testing.T) {
 				t.Errorf("Expected Access-Control-Allow-Origin to be %q but got %q", tt.expectedOrigin, origin)
 			}
 
-			if tt.config.AllowCredentials {
+			// Only check for CORS headers if the origin is allowed or empty
+			originAllowed := tt.expectedOrigin != "" || tt.requestOrigin == ""
+
+			if originAllowed {
+				if tt.config.AllowCredentials {
+					credentials := resp.Header.Get("Access-Control-Allow-Credentials")
+					if credentials != "true" {
+						t.Errorf("Expected Access-Control-Allow-Credentials to be 'true' but got %q", credentials)
+					}
+				}
+
+				if tt.config.AllowHeaders != "" {
+					headers := resp.Header.Get("Access-Control-Allow-Headers")
+					if headers != tt.config.AllowHeaders {
+						t.Errorf("Expected Access-Control-Allow-Headers to be %q but got %q", tt.config.AllowHeaders, headers)
+					}
+				}
+
+				if tt.config.ExposeHeaders != "" {
+					exposeHeaders := resp.Header.Get("Access-Control-Expose-Headers")
+					if exposeHeaders != tt.config.ExposeHeaders {
+						t.Errorf("Expected Access-Control-Expose-Headers to be %q but got %q", tt.config.ExposeHeaders, exposeHeaders)
+					}
+				}
+
+				if tt.config.AllowMethods != "" {
+					methods := resp.Header.Get("Access-Control-Allow-Methods")
+					if methods != tt.config.AllowMethods {
+						t.Errorf("Expected Access-Control-Allow-Methods to be %q but got %q", tt.config.AllowMethods, methods)
+					}
+				}
+			} else {
+				// For disallowed origins, verify that no CORS headers are present
 				credentials := resp.Header.Get("Access-Control-Allow-Credentials")
-				if credentials != "true" {
-					t.Errorf("Expected Access-Control-Allow-Credentials to be 'true' but got %q", credentials)
+				if credentials != "" {
+					t.Errorf("Expected no Access-Control-Allow-Credentials header for disallowed origin, but got %q", credentials)
 				}
-			}
 
-			if tt.config.AllowHeaders != "" {
 				headers := resp.Header.Get("Access-Control-Allow-Headers")
-				if headers != tt.config.AllowHeaders {
-					t.Errorf("Expected Access-Control-Allow-Headers to be %q but got %q", tt.config.AllowHeaders, headers)
+				if headers != "" {
+					t.Errorf("Expected no Access-Control-Allow-Headers header for disallowed origin, but got %q", headers)
 				}
-			}
 
-			if tt.config.ExposeHeaders != "" {
 				exposeHeaders := resp.Header.Get("Access-Control-Expose-Headers")
-				if exposeHeaders != tt.config.ExposeHeaders {
-					t.Errorf("Expected Access-Control-Expose-Headers to be %q but got %q", tt.config.ExposeHeaders, exposeHeaders)
+				if exposeHeaders != "" {
+					t.Errorf("Expected no Access-Control-Expose-Headers header for disallowed origin, but got %q", exposeHeaders)
 				}
-			}
 
-			if tt.config.AllowMethods != "" {
 				methods := resp.Header.Get("Access-Control-Allow-Methods")
-				if methods != tt.config.AllowMethods {
-					t.Errorf("Expected Access-Control-Allow-Methods to be %q but got %q", tt.config.AllowMethods, methods)
+				if methods != "" {
+					t.Errorf("Expected no Access-Control-Allow-Methods header for disallowed origin, but got %q", methods)
 				}
 			}
 
-			// Check Max-Age header for preflight requests
+			// Check Max-Age header for preflight requests (only for allowed origins)
 			if tt.expectPreflightCheck && tt.expectedMaxAge != "" {
-				maxAge := resp.Header.Get("Access-Control-Max-Age")
-				if maxAge != tt.expectedMaxAge {
-					t.Errorf("Expected Access-Control-Max-Age to be %q but got %q", tt.expectedMaxAge, maxAge)
+				if originAllowed {
+					maxAge := resp.Header.Get("Access-Control-Max-Age")
+					if maxAge != tt.expectedMaxAge {
+						t.Errorf("Expected Access-Control-Max-Age to be %q but got %q", tt.expectedMaxAge, maxAge)
+					}
+				} else {
+					maxAge := resp.Header.Get("Access-Control-Max-Age")
+					if maxAge != "" {
+						t.Errorf("Expected no Access-Control-Max-Age header for disallowed origin, but got %q", maxAge)
+					}
 				}
 			}
 		})
