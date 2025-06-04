@@ -40,6 +40,7 @@ func main() {
 		fmt.Printf("→ Request Headers: %v\n", c.GetReqHeaders())
 		err := c.Next()
 		fmt.Printf("← Response Headers: %v\n", c.GetRespHeaders())
+		fmt.Printf("← %s %s | Status: %d\n", c.Method(), c.Path(), c.Response().StatusCode())
 		return err
 	})
 	app.Use(cors.New(config))
