@@ -34,7 +34,6 @@ func main() {
 		}
 
 	// configure CORS middleware
-	app.Use(cors.New(config))
 
 	app.Use(func(c *fiber.Ctx) error {
 		fmt.Printf("→ %s %s | Origin: %s\n", c.Method(), c.Path(), c.Get("Origin"))
@@ -43,6 +42,7 @@ func main() {
 		fmt.Printf("← Response Headers: %v\n", c.GetRespHeaders())
 		return err
 	})
+	app.Use(cors.New(config))
 
 	app.Get("/", func(c *fiber.Ctx) error {
 		// Only expose serializable config fields
