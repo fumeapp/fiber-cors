@@ -26,13 +26,17 @@ func getFiberVersion() string {
 func main() {
 	app := fiber.New()
 
-	// Get default CORS configuration
-	corsConfig := cors.DefaultConfig()
+	corsConfig := cors.Config{
+		AllowOrigins:     "https://fiber-cors-nuxt.acidjazz.workers.dev, https://console.domain.com, http://localhost:3000",
+		AllowCredentials: true,
+		AllowHeaders:     "Origin, Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, User-Agent",
+		ExposeHeaders:    "Origin, User-Agent",
+		AllowMethods:     "GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD",
+	}
 
 	app.Use(cors.New(corsConfig))
 
 	app.Get("/", func(c *fiber.Ctx) error {
-		// Only expose serializable config fields
 		configResponse := fiber.Map{
 			"AllowOrigins":     corsConfig.AllowOrigins,
 			"AllowCredentials": corsConfig.AllowCredentials,
