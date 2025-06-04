@@ -2,6 +2,7 @@ package cors
 
 import (
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
@@ -172,6 +173,53 @@ func TestCorsMiddleware(t *testing.T) {
 			expectedMaxAge:       "", // No Max-Age header for disallowed origins
 			expectPreflightCheck: true,
 		},
+		{
+			name: "case-insensitive origin matching",
+			config: Config{
+				AllowOrigins:     "https://example.com",
+				AllowCredentials: true,
+				AllowHeaders:     "Content-Type",
+				ExposeHeaders:    "X-Custom",
+				AllowMethods:     "GET, POST, OPTIONS",
+			},
+			requestOrigin:  "https://EXAMPLE.com",
+			requestMethod:  "GET",
+			expectedOrigin: "https://EXAMPLE.com", // Should match despite case difference
+			expectedStatus: 200,
+		},
+		{
+			name: "header validation for preflight",
+			config: Config{
+				AllowOrigins:     "https://example.com",
+				AllowCredentials: true,
+				AllowHeaders:     "", // Empty AllowHeaders to test validation
+				ExposeHeaders:    "X-Custom",
+				AllowMethods:     "GET, POST, OPTIONS",
+			},
+			requestOrigin: "https://example.com",
+			requestMethod: "OPTIONS",
+			requestHeaders: map[string]string{
+				"Access-Control-Request-Method":  "POST",
+				"Access-Control-Request-Headers": "content-type, authorization, x-csrf-token, host", // Mix of safe and unsafe headers
+			},
+			expectedOrigin:       "https://example.com",
+			expectedStatus:       204,
+			expectPreflightCheck: true,
+		},
+		{
+			name: "default methods when not configured",
+			config: Config{
+				AllowOrigins:     "https://example.com",
+				AllowCredentials: true,
+				AllowHeaders:     "Content-Type",
+				ExposeHeaders:    "X-Custom",
+				AllowMethods:     "", // Empty AllowMethods to test defaults
+			},
+			requestOrigin:  "https://example.com",
+			requestMethod:  "GET",
+			expectedOrigin: "https://example.com",
+			expectedStatus: 200,
+		},
 	}
 
 	for _, tt := range tests {
@@ -274,6 +322,58 @@ func TestCorsMiddleware(t *testing.T) {
 					if maxAge != "" {
 						t.Errorf("Expected no Access-Control-Max-Age header for disallowed origin, but got %q", maxAge)
 					}
+				}
+			}
+
+			// Test default methods when not configured
+			if tt.name == "default methods when not configured" {
+				methods := resp.Header.Get("Access-Control-Allow-Methods")
+				expectedDefaultMethods := "GET, POST, HEAD, OPTIONS"
+				if methods != expectedDefaultMethods {
+					t.Errorf("Expected default Access-Control-Allow-Methods to be %q but got %q", expectedDefaultMethods, methods)
+				}
+			}
+
+			// Test header validation for preflight
+			if tt.name == "header validation for preflight" && tt.expectPreflightCheck {
+				headers := resp.Header.Get("Access-Control-Allow-Headers")
+				if headers != "" {
+					// Check that unsafe headers like "host" are not included
+					headersList := strings.Split(headers, ",")
+					for _, header := range headersList {
+						header = strings.TrimSpace(strings.ToLower(header))
+						if header == "host" {
+							t.Errorf("Unsafe header 'host' should not be included in Access-Control-Allow-Headers")
+						}
+					}
+
+					// Check that safe headers are included
+					foundContentType := false
+					foundAuthorization := false
+					foundCsrfToken := false
+
+					for _, header := range headersList {
+						header = strings.TrimSpace(strings.ToLower(header))
+						if header == "content-type" {
+							foundContentType = true
+						} else if header == "authorization" {
+							foundAuthorization = true
+						} else if header == "x-csrf-token" {
+							foundCsrfToken = true
+						}
+					}
+
+					if !foundContentType {
+						t.Errorf("Safe header 'content-type' should be included in Access-Control-Allow-Headers")
+					}
+					if !foundAuthorization {
+						t.Errorf("Safe header 'authorization' should be included in Access-Control-Allow-Headers")
+					}
+					if !foundCsrfToken {
+						t.Errorf("Safe header 'x-csrf-token' should be included in Access-Control-Allow-Headers")
+					}
+				} else {
+					t.Errorf("Expected Access-Control-Allow-Headers to be set for preflight request")
 				}
 			}
 		})
