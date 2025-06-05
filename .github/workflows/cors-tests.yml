@@ -1,0 +1,20 @@
+name: CORS Tests
+
+on:
+  push: # Run on any push
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  curl-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Make curl test script executable
+        run: chmod +x ./curl_test.sh
+
+      - name: Run CORS curl tests
+        run: |
+          # Run the curl tests against the deployed endpoint
+          ./curl_test.sh https://d245hvitoez60u.cloudfront.net
